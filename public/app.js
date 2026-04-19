@@ -314,11 +314,21 @@
     setTimeout(() => els.inputLast4.focus(), 100)
   }
 
-  function closeAuthModal() {
+  // 인증 모달을 "취소"로 닫을 때 - state도 완전 초기화
+  function cancelAuthModal() {
     els.modalAuth.hidden = true
-    state.authTarget = null
     els.inputLast4.value = ''
     els.authError.hidden = true
+    state.authTarget = null
+    state.verifiedLast4 = null
+  }
+
+  // 인증 성공 후 수정 모달로 넘어갈 때 - state 유지 (authTarget 살려둠)
+  function hideAuthModalKeepState() {
+    els.modalAuth.hidden = true
+    els.inputLast4.value = ''
+    els.authError.hidden = true
+    // state.authTarget 및 state.verifiedLast4 는 수정 단계에서 사용되므로 유지
   }
 
   async function handleAuthConfirm() {
@@ -355,9 +365,9 @@
         throw new Error(result.error)
       }
 
-      // 인증 성공 - last4 저장 후 수정 모달 오픈
+      // 인증 성공 - last4 저장 후 수정 모달 오픈 (state 유지)
       state.verifiedLast4 = last4
-      closeAuthModal()
+      hideAuthModalKeepState()   // ← authTarget 유지한 채로 인증 모달만 닫음
       openEditModal(result)
     } catch (err) {
       console.error('verify error:', err)
@@ -379,8 +389,10 @@
     els.modalEdit.hidden = false
   }
 
+  // 수정 모달 닫을 때 - 여기서 state 완전 초기화
   function closeEditModal() {
     els.modalEdit.hidden = true
+    state.authTarget = null
     state.verifiedLast4 = null
   }
 
@@ -486,7 +498,7 @@
 
     // 인증 모달
     els.btnAuthConfirm.addEventListener('click', handleAuthConfirm)
-    els.btnAuthCancel.addEventListener('click', closeAuthModal)
+    els.btnAuthCancel.addEventListener('click', cancelAuthModal)
     els.inputLast4.addEventListener('input', (e) => {
       // 숫자만 허용
       e.target.value = extractDigits(e.target.value).slice(0, 4)
@@ -503,7 +515,7 @@
     // ESC 키로 모달 닫기
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if (!els.modalAuth.hidden) closeAuthModal()
+        if (!els.modalAuth.hidden) cancelAuthModal()
         else if (!els.modalEdit.hidden) closeEditModal()
         else if (!els.modalMessage.hidden) els.modalMessage.hidden = true
       }
