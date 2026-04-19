@@ -75,7 +75,7 @@ function handleRequest(e, method) {
       case 'update':
         return jsonResponse(updateEntry(params.id, params.data, params.last4))
       case 'ping':
-        return jsonResponse({ ok: true, version: '1.0.0', time: new Date().toISOString() })
+        return jsonResponse({ ok: true, version: '1.1.0', time: new Date().toISOString() })
       default:
         return jsonResponse({ ok: false, error: 'UNKNOWN_ACTION' })
     }
@@ -174,6 +174,28 @@ function listWaiting() {
 }
 
 // ============================================================
+// 전화번호 유효성 검증 헬퍼
+// 한국 휴대폰 형식: 010-XXXX-XXXX (총 11자리 숫자, 010으로 시작)
+// ============================================================
+
+function validateKoreanMobile(phone) {
+  const digits = String(phone || '').replace(/\D/g, '')
+
+  if (digits.length === 0) return { ok: false, error: 'PHONE_REQUIRED' }
+  if (digits.length !== 11) return { ok: false, error: 'PHONE_INVALID_LENGTH' }
+  if (!digits.startsWith('010')) return { ok: false, error: 'PHONE_INVALID_PREFIX' }
+
+  return { ok: true, digits: digits }
+}
+
+// 하이픈 포함 표준 포맷으로 정규화: 010-XXXX-XXXX
+function normalizeKoreanMobile(phone) {
+  const digits = String(phone || '').replace(/\D/g, '')
+  if (digits.length !== 11) return phone   // 검증 실패 시 원본 반환 (validate에서 거르므로 이 경로는 안전)
+  return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11)
+}
+
+// ============================================================
 // 액션 2 - 신규 접수 등록
 // ============================================================
 
@@ -188,12 +210,13 @@ function createEntry(data) {
   const email = sanitize(data.email || '')
 
   if (!name) return { ok: false, error: 'NAME_REQUIRED' }
-  if (!phone) return { ok: false, error: 'PHONE_REQUIRED' }
 
-  const phoneDigits = phone.replace(/\D/g, '')
-  if (phoneDigits.length < 4) {
-    return { ok: false, error: 'PHONE_TOO_SHORT' }
-  }
+  // 한국 휴대폰 형식 엄격 검증
+  const phoneCheck = validateKoreanMobile(phone)
+  if (!phoneCheck.ok) return phoneCheck
+
+  // 표준 포맷으로 정규화하여 저장
+  const normalizedPhone = normalizeKoreanMobile(phone)
 
   // LockService로 동시성 제어 (동시 등록 시 행 충돌 방지)
   const lock = LockService.getScriptLock()
@@ -213,7 +236,7 @@ function createEntry(data) {
     if (map['상품'] !== undefined) newRow[map['상품']] = ''
     if (map['상황'] !== undefined) newRow[map['상황']] = CONFIG.DEFAULT_STATUS
     if (map['이름'] !== undefined) newRow[map['이름']] = name
-    if (map['전화번호'] !== undefined) newRow[map['전화번호']] = phone
+    if (map['전화번호'] !== undefined) newRow[map['전화번호']] = normalizedPhone
     if (map['이메일'] !== undefined) newRow[map['이메일']] = email
     if (map['파일명'] !== undefined) newRow[map['파일명']] = ''
     if (map['인증키'] !== undefined) newRow[map['인증키']] = ''
@@ -243,6 +266,13 @@ function verifyPhone(id, last4) {
   if (!row) return { ok: false, error: 'NOT_FOUND' }
 
   const phoneDigits = String(row.data['전화번호'] || '').replace(/\D/g, '')
+
+  // 저장된 번호가 정상 11자리가 아닐 경우 디버깅을 위한 에러 분리
+  if (phoneDigits.length !== 11) {
+    Logger.log('verifyPhone: 비정상 저장 번호 id=' + id + ' digits=[' + phoneDigits + '] length=' + phoneDigits.length)
+    return { ok: false, error: 'STORED_PHONE_CORRUPTED', debug: phoneDigits.length }
+  }
+
   const actualLast4 = phoneDigits.slice(-4)
 
   if (actualLast4 !== last4Digits) {
@@ -273,9 +303,11 @@ function updateEntry(id, data, last4) {
   const phone = sanitize(data.phone)
   const email = sanitize(data.email || '')
 
-  if (!phone) return { ok: false, error: 'PHONE_REQUIRED' }
-  const phoneDigits = phone.replace(/\D/g, '')
-  if (phoneDigits.length < 4) return { ok: false, error: 'PHONE_TOO_SHORT' }
+  // 한국 휴대폰 형식 엄격 검증 (신규 번호에도 동일 적용)
+  const phoneCheck = validateKoreanMobile(phone)
+  if (!phoneCheck.ok) return phoneCheck
+
+  const normalizedPhone = normalizeKoreanMobile(phone)
 
   const lock = LockService.getScriptLock()
   try {
@@ -288,7 +320,7 @@ function updateEntry(id, data, last4) {
 
     // 이름은 수정 불가 - 전화번호/이메일만 업데이트
     if (map['전화번호'] !== undefined) {
-      sheet.getRange(row.rowIndex, map['전화번호'] + 1).setValue(phone)
+      sheet.getRange(row.rowIndex, map['전화번호'] + 1).setValue(normalizedPhone)
     }
     if (map['이메일'] !== undefined) {
       sheet.getRange(row.rowIndex, map['이메일'] + 1).setValue(email)
@@ -415,4 +447,18 @@ function testVerify() {
     const firstId = list.list[0].id
     Logger.log(JSON.stringify(verifyPhone(firstId, '5678'), null, 2))
   }
+}
+
+// 특정 ID의 저장 상태 진단용
+function testInspectRow() {
+  const targetId = 'uFgqcZ2S'   // 문제 있는 ID로 교체해서 사용
+  const row = findRowById(targetId)
+  if (!row) {
+    Logger.log('행 없음: ' + targetId)
+    return
+  }
+  Logger.log('전화번호 원본: [' + row.data['전화번호'] + ']')
+  const digits = String(row.data['전화번호'] || '').replace(/\D/g, '')
+  Logger.log('숫자만: [' + digits + '] length=' + digits.length)
+  Logger.log('끝4자리: [' + digits.slice(-4) + ']')
 }

@@ -1,11 +1,5 @@
 /**
- * 미담사진관 태블릿 웹 - 메인 로직
- *
- * 구조:
- * - api: Apps Script 백엔드 통신
- * - ui: DOM 조작
- * - state: 전역 상태 (현재 인증 중인 대상 등)
- * - handlers: 이벤트 핸들러
+ * 미담사진관 태블릿 웹 - 메인 로직 (프로덕션)
  */
 
 (function () {
@@ -17,7 +11,7 @@
   const state = {
     waitlist: [],
     authTarget: null,      // { id, name } - 현재 인증 중인 대기자
-    verifiedLast4: null,   // 인증 성공한 끝4자리 (수정 시 재전송용)
+    verifiedLast4: null,   // 인증 성공한 끝4자리
     isSubmitting: false,
     isLoading: false
   }
@@ -61,15 +55,6 @@
   // 유틸
   // ============================================================
 
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
-  }
-
   function sanitizeInput(str) {
     if (str === null || str === undefined) return ''
     return String(str).trim().replace(/[\x00-\x1F\x7F]/g, '').slice(0, 200)
@@ -79,9 +64,26 @@
     return String(str || '').replace(/\D/g, '')
   }
 
-  // 전화번호 최소 4자리 이상 숫자
-  function isValidPhone(phone) {
-    return extractDigits(phone).length >= 4
+  // 한국 휴대폰 형식 검증 (010으로 시작, 총 11자리)
+  function isValidKoreanMobile(phone) {
+    const digits = extractDigits(phone)
+    return digits.length === 11 && digits.startsWith('010')
+  }
+
+  // 입력값을 010-XXXX-XXXX 형식으로 자동 포매팅
+  // 최대 11자리까지만 허용 (12자리 이상 입력 불가)
+  function formatPhoneInput(raw) {
+    let digits = extractDigits(raw).slice(0, 11)   // 11자리 초과 자동 절삭
+
+    // 010 자동 프리필
+    if (digits.length > 0 && !digits.startsWith('0')) {
+      digits = '010' + digits
+      digits = digits.slice(0, 11)
+    }
+
+    if (digits.length <= 3) return digits
+    if (digits.length <= 7) return digits.slice(0, 3) + '-' + digits.slice(3)
+    return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11)
   }
 
   function isValidEmail(email) {
@@ -90,25 +92,20 @@
   }
 
   // ============================================================
-  // 커스텀 메시지 모달 (alert 대체)
+  // 메시지 모달 (재진입 안전)
   // ============================================================
 
+  let messageResolve = null
   function showMessage(message) {
     return new Promise((resolve) => {
       els.modalMessageText.textContent = message
       els.modalMessage.hidden = false
-
-      const onOk = () => {
-        els.modalMessage.hidden = true
-        els.btnMessageOk.removeEventListener('click', onOk)
-        resolve()
-      }
-      els.btnMessageOk.addEventListener('click', onOk)
+      messageResolve = resolve
     })
   }
 
   // ============================================================
-  // 토스트 (가벼운 알림용)
+  // 토스트
   // ============================================================
 
   function showToast(message, type = 'default') {
@@ -116,10 +113,7 @@
     toast.className = 'toast' + (type !== 'default' ? ' toast--' + type : '')
     toast.textContent = message
     els.toastContainer.appendChild(toast)
-
-    setTimeout(() => {
-      toast.remove()
-    }, 2600)
+    setTimeout(() => toast.remove(), 2600)
   }
 
   // ============================================================
@@ -143,51 +137,40 @@
     const timeout = setTimeout(() => controller.abort(), config.REQUEST_TIMEOUT_MS || 15000)
 
     try {
-      // text/plain으로 보내서 CORS preflight 회피
       const response = await fetch(config.APPS_SCRIPT_URL, {
         method: 'POST',
         mode: 'cors',
         cache: 'no-cache',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(body),
         signal: controller.signal,
         redirect: 'follow'
       })
 
       clearTimeout(timeout)
-
-      if (!response.ok) {
-        throw new Error('HTTP_' + response.status)
-      }
+      if (!response.ok) throw new Error('HTTP_' + response.status)
 
       const json = await response.json()
       return json
     } catch (err) {
       clearTimeout(timeout)
-      if (err.name === 'AbortError') {
-        throw new Error('TIMEOUT')
-      }
+      if (err.name === 'AbortError') throw new Error('TIMEOUT')
       throw err
     }
   }
 
   // ============================================================
-  // 대기리스트 로드
+  // 대기리스트
   // ============================================================
 
   async function loadWaitlist() {
     if (state.isLoading) return
     state.isLoading = true
-
     els.btnRefresh.classList.add('is-spinning')
 
     try {
       const result = await apiCall('list')
-      if (!result.ok) {
-        throw new Error(result.error || 'LOAD_FAILED')
-      }
+      if (!result.ok) throw new Error(result.error || 'LOAD_FAILED')
       state.waitlist = result.list || []
       renderWaitlist()
     } catch (err) {
@@ -195,9 +178,7 @@
       renderWaitlistError(err.message)
     } finally {
       state.isLoading = false
-      setTimeout(() => {
-        els.btnRefresh.classList.remove('is-spinning')
-      }, 300)
+      setTimeout(() => els.btnRefresh.classList.remove('is-spinning'), 300)
     }
   }
 
@@ -219,7 +200,7 @@
       div.className = 'waitlist-item'
       div.dataset.id = item.id
       div.dataset.name = item.name
-      div.textContent = item.name   // textContent로 XSS 방어
+      div.textContent = item.name
       div.addEventListener('click', () => openAuthModal(item))
       frag.appendChild(div)
     })
@@ -246,41 +227,22 @@
     const phone = sanitizeInput(els.inputPhone.value)
     const email = sanitizeInput(els.inputEmail.value)
 
-    // 유효성 검증
-    if (!name) {
-      await showMessage('이름을 입력해주세요')
-      els.inputName.focus()
-      return
-    }
-    if (!phone || phone === '010-') {
-      await showMessage('전화번호를 입력해주세요')
+    if (!name) { await showMessage('이름을 입력해주세요'); els.inputName.focus(); return }
+    if (!phone || phone === '010-') { await showMessage('전화번호를 입력해주세요'); els.inputPhone.focus(); return }
+    if (!isValidKoreanMobile(phone)) {
+      await showMessage('전화번호를 정확히 입력해주세요\n(010으로 시작하는 11자리)')
       els.inputPhone.focus()
       return
     }
-    if (!isValidPhone(phone)) {
-      await showMessage('전화번호는 4자리 이상 입력해주세요')
-      els.inputPhone.focus()
-      return
-    }
-    if (email && !isValidEmail(email)) {
-      await showMessage('이메일 형식이 올바르지 않습니다')
-      els.inputEmail.focus()
-      return
-    }
+    if (email && !isValidEmail(email)) { await showMessage('이메일 형식이 올바르지 않습니다'); els.inputEmail.focus(); return }
 
     state.isSubmitting = true
     els.btnSubmit.disabled = true
     els.btnSubmit.textContent = '등록 중...'
 
     try {
-      const result = await apiCall('create', {
-        data: { name, phone, email }
-      })
-
-      if (!result.ok) {
-        throw new Error(result.error || 'CREATE_FAILED')
-      }
-
+      const result = await apiCall('create', { data: { name, phone, email } })
+      if (!result.ok) throw new Error(result.error || 'CREATE_FAILED')
       showToast('등록 완료', 'success')
       resetForm()
       await loadWaitlist()
@@ -314,7 +276,6 @@
     setTimeout(() => els.inputLast4.focus(), 100)
   }
 
-  // 인증 모달을 "취소"로 닫을 때 - state도 완전 초기화
   function cancelAuthModal() {
     els.modalAuth.hidden = true
     els.inputLast4.value = ''
@@ -323,7 +284,6 @@
     state.verifiedLast4 = null
   }
 
-  // 인증 성공 후 수정 모달로 넘어갈 때 - state 유지 (authTarget 살려둠)
   function hideAuthModalKeepState() {
     els.modalAuth.hidden = true
     els.inputLast4.value = ''
@@ -358,16 +318,20 @@
           return
         }
         if (result.error === 'NOT_FOUND') {
-          els.authError.textContent = '대기 목록에서 찾을 수 없습니다 (새로고침 필요)'
+          els.authError.textContent = '대기 목록에서 찾을 수 없습니다'
+          els.authError.hidden = false
+          return
+        }
+        if (result.error === 'STORED_PHONE_CORRUPTED') {
+          els.authError.textContent = '저장된 번호가 비정상입니다\n관리자 앱에서 수정해주세요'
           els.authError.hidden = false
           return
         }
         throw new Error(result.error)
       }
 
-      // 인증 성공 - last4 저장 후 수정 모달 오픈 (state 유지)
       state.verifiedLast4 = last4
-      hideAuthModalKeepState()   // ← authTarget 유지한 채로 인증 모달만 닫음
+      hideAuthModalKeepState()
       openEditModal(result)
     } catch (err) {
       console.error('verify error:', err)
@@ -389,7 +353,6 @@
     els.modalEdit.hidden = false
   }
 
-  // 수정 모달 닫을 때 - 여기서 state 완전 초기화
   function closeEditModal() {
     els.modalEdit.hidden = true
     state.authTarget = null
@@ -406,21 +369,13 @@
     const phone = sanitizeInput(els.editPhone.value)
     const email = sanitizeInput(els.editEmail.value)
 
-    if (!phone) {
-      await showMessage('전화번호를 입력해주세요')
+    if (!phone) { await showMessage('전화번호를 입력해주세요'); els.editPhone.focus(); return }
+    if (!isValidKoreanMobile(phone)) {
+      await showMessage('전화번호를 정확히 입력해주세요\n(010으로 시작하는 11자리)')
       els.editPhone.focus()
       return
     }
-    if (!isValidPhone(phone)) {
-      await showMessage('전화번호는 4자리 이상 입력해주세요')
-      els.editPhone.focus()
-      return
-    }
-    if (email && !isValidEmail(email)) {
-      await showMessage('이메일 형식이 올바르지 않습니다')
-      els.editEmail.focus()
-      return
-    }
+    if (email && !isValidEmail(email)) { await showMessage('이메일 형식이 올바르지 않습니다'); els.editEmail.focus(); return }
 
     els.btnEditSave.disabled = true
 
@@ -431,9 +386,7 @@
         data: { phone, email }
       })
 
-      if (!result.ok) {
-        throw new Error(result.error || 'UPDATE_FAILED')
-      }
+      if (!result.ok) throw new Error(result.error || 'UPDATE_FAILED')
 
       showToast('수정 완료', 'success')
       closeEditModal()
@@ -455,6 +408,8 @@
       'NAME_REQUIRED': '이름을 입력해주세요',
       'PHONE_REQUIRED': '전화번호를 입력해주세요',
       'PHONE_TOO_SHORT': '전화번호는 4자리 이상이어야 합니다',
+      'PHONE_INVALID_LENGTH': '전화번호는 11자리여야 합니다',
+      'PHONE_INVALID_PREFIX': '전화번호는 010으로 시작해야 합니다',
       'LAST4_INVALID': '숫자 4자리를 입력해주세요',
       'LAST4_MISMATCH': '끝자리가 맞지 않습니다',
       'NOT_FOUND': '대상을 찾을 수 없습니다',
@@ -465,7 +420,8 @@
       'CREATE_FAILED': '등록 중 오류 발생',
       'UPDATE_FAILED': '수정 중 오류 발생',
       'LOAD_FAILED': '불러오기 실패',
-      'UNKNOWN_ACTION': '알 수 없는 요청'
+      'UNKNOWN_ACTION': '알 수 없는 요청',
+      'STORED_PHONE_CORRUPTED': '저장된 번호가 비정상입니다'
     }
     if (!code) return '오류 발생'
     if (code.startsWith('HTTP_')) return '네트워크 오류 (' + code + ')'
@@ -473,34 +429,46 @@
   }
 
   // ============================================================
-  // 초기화 - 이벤트 바인딩
+  // 초기화
   // ============================================================
 
   function init() {
-    // 디버그 border 토글
     if (window.APP_CONFIG && window.APP_CONFIG.DEBUG_BORDER) {
       document.body.classList.add('debug-border')
     }
 
-    // 등록
     els.btnSubmit.addEventListener('click', handleSubmit)
     els.btnCancel.addEventListener('click', resetForm)
 
-    // 전화번호 입력 시 010- 유지 처리
+    // 전화번호 입력 자동 포매팅 - 등록 폼
     els.inputPhone.addEventListener('focus', () => {
-      if (!els.inputPhone.value) {
-        els.inputPhone.value = '010-'
+      if (!els.inputPhone.value) els.inputPhone.value = '010-'
+    })
+    els.inputPhone.addEventListener('input', (e) => {
+      const cursorAtEnd = e.target.selectionStart === e.target.value.length
+      e.target.value = formatPhoneInput(e.target.value)
+      if (cursorAtEnd) {
+        const len = e.target.value.length
+        e.target.setSelectionRange(len, len)
       }
     })
 
-    // 새로고침
+    // 수정 모달 전화번호 입력 자동 포매팅
+    els.editPhone.addEventListener('input', (e) => {
+      const cursorAtEnd = e.target.selectionStart === e.target.value.length
+      e.target.value = formatPhoneInput(e.target.value)
+      if (cursorAtEnd) {
+        const len = e.target.value.length
+        e.target.setSelectionRange(len, len)
+      }
+    })
+
     els.btnRefresh.addEventListener('click', loadWaitlist)
 
-    // 인증 모달
     els.btnAuthConfirm.addEventListener('click', handleAuthConfirm)
     els.btnAuthCancel.addEventListener('click', cancelAuthModal)
+
     els.inputLast4.addEventListener('input', (e) => {
-      // 숫자만 허용
       e.target.value = extractDigits(e.target.value).slice(0, 4)
       els.authError.hidden = true
     })
@@ -508,30 +476,33 @@
       if (e.key === 'Enter') handleAuthConfirm()
     })
 
-    // 수정 모달
     els.btnEditSave.addEventListener('click', handleEditSave)
     els.btnEditCancel.addEventListener('click', closeEditModal)
 
-    // ESC 키로 모달 닫기
+    els.btnMessageOk.addEventListener('click', () => {
+      els.modalMessage.hidden = true
+      if (messageResolve) { messageResolve(); messageResolve = null }
+    })
+
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (!els.modalAuth.hidden) cancelAuthModal()
         else if (!els.modalEdit.hidden) closeEditModal()
-        else if (!els.modalMessage.hidden) els.modalMessage.hidden = true
+        else if (!els.modalMessage.hidden) {
+          els.modalMessage.hidden = true
+          if (messageResolve) { messageResolve(); messageResolve = null }
+        }
       }
     })
 
-    // 자동 새로고침
     if (window.APP_CONFIG && window.APP_CONFIG.AUTO_REFRESH_MS > 0) {
       setInterval(() => {
-        // 모달이 열려있으면 새로고침 스킵 (UX 방해 방지)
         if (els.modalAuth.hidden && els.modalEdit.hidden && els.modalMessage.hidden) {
           loadWaitlist()
         }
       }, window.APP_CONFIG.AUTO_REFRESH_MS)
     }
 
-    // Service Worker 등록 (PWA)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch((err) => {
@@ -540,11 +511,9 @@
       })
     }
 
-    // 초기 로드
     loadWaitlist()
   }
 
-  // DOM 준비 후 실행
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init)
   } else {
