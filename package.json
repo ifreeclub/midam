@@ -1,0 +1,9 @@
+{
+  "name": "midam-tablet",
+  "version": "1.0.0",
+  "description": "미담사진관 손님용 태블릿 웹",
+  "private": true,
+  "scripts": {
+    "build": "echo 'static site - no build'"
+  }
+}

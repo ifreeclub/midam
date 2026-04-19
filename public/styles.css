@@ -1,0 +1,496 @@
+/* ============================================================
+   미담사진관 태블릿 웹 - 스타일
+   고객 피드백 반영 버전 (2026.04.18)
+   - 좌 66% / 우 나머지 (새로고침 약 50px 별도)
+   - 중장년층 고려 폰트 크기
+   - 좌우 헤더 높이 동일
+   ============================================================ */
+
+/* ---- 리셋 ---- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body {
+  font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #ffffff;
+  color: #2c3e50;
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input {
+  font-family: inherit;
+}
+
+/* ---- CSS 변수 ---- */
+:root {
+  --color-navy: #2c3e50;
+  --color-navy-hover: #34495e;
+  --color-white: #ffffff;
+  --color-gray-border: #d0d7de;
+  --color-gray-bg: #f5f7fa;
+  --color-red: #e74c3c;
+  --color-blue: rgb(21, 24, 204);
+  --color-primary: #2c3e50;
+  --color-secondary: #95a5a6;
+
+  /* 고객 지정 폰트 크기 */
+  --fs-panel-header: 21px;
+  --fs-label: 19px;
+  --fs-notice: 18px;
+  --fs-waitlist-name: 19px;
+  --fs-email-warning: 16px;
+  --fs-waitlist-guide: 17px;
+  --fs-auth-header: 21px;
+  --fs-auth-body: 16px;
+  --fs-refresh: 22px;
+
+  /* 레이아웃 */
+  --top-header-height: 56px;
+  --panel-header-height: 54px;
+  --refresh-box-width: 50px;
+}
+
+/* ---- 디버그 모드 (config에서 제어) ---- */
+body.debug-border .panel,
+body.debug-border .panel-header,
+body.debug-border .panel-body,
+body.debug-border .refresh-box,
+body.debug-border .right-header-row,
+body.debug-border .form-group {
+  outline: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+/* ---- 상단 헤더 ---- */
+.top-header {
+  height: var(--top-header-height);
+  background: var(--color-navy);
+  color: var(--color-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+}
+
+.top-header__title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* ---- 메인 레이아웃 - flex 66 : 나머지 ---- */
+/* align-items: flex-start -> 좌우 패널 상단 정렬 (대기리스트가 길어져도 좌측 입력폼은 상단 고정) */
+.main-layout {
+  display: flex;
+  align-items: flex-start;
+  height: calc(100vh - var(--top-header-height));
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 좌측 - 66% */
+/* align-self: flex-start + 콘텐츠 높이만큼만 차지 (스크롤 없음) */
+.panel-left {
+  flex: 0 0 66%;
+  align-self: flex-start;
+  border-right: 1px solid var(--color-gray-border);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-height: 100%;
+}
+
+/* 우측 - 나머지 (약 34%) */
+/* 전체 높이 차지 + 내부에서 스크롤 발생 */
+.panel-right {
+  flex: 1 1 auto;
+  align-self: stretch;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---- 우측 헤더 행 (미담대기자 + 새로고침 분리) ---- */
+.right-header-row {
+  display: flex;
+  height: var(--panel-header-height);
+}
+
+.right-main-header {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.refresh-box {
+  flex: 0 0 var(--refresh-box-width);
+  width: var(--refresh-box-width);
+  background: var(--color-navy);
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-refresh {
+  width: 100%;
+  height: 100%;
+  color: var(--color-white);
+  font-size: var(--fs-refresh);
+  font-weight: 700;
+  transition: background 0.15s;
+}
+
+.btn-refresh:active {
+  background: var(--color-navy-hover);
+}
+
+.btn-refresh.is-spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- 패널 공통 헤더 ---- */
+.panel-header {
+  height: var(--panel-header-height);
+  background: var(--color-navy);
+  color: var(--color-white);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.panel-header__title {
+  font-size: var(--fs-panel-header);
+  font-weight: 700;
+}
+
+/* ---- 패널 본문 ---- */
+/* 기본: overflow 없음 - 좌측 패널 기준 (내용만큼 차지) */
+.panel-body {
+  flex: 1 1 auto;
+  padding: 20px;
+  background: var(--color-white);
+}
+
+/* 우측 패널 본문에만 스크롤 허용 */
+.panel-right .panel-body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.panel-body--waitlist {
+  padding: 16px 12px;
+}
+
+/* ---- 좌측 접수 폼 ---- */
+.notice-text {
+  font-size: var(--fs-notice);
+  font-weight: 700;
+  color: var(--color-navy);
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-label {
+  display: block;
+  font-size: var(--fs-label);
+  font-weight: 700;
+  color: var(--color-navy);
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 18px;
+  border: 2px solid var(--color-gray-border);
+  border-radius: 6px;
+  background: var(--color-white);
+  color: var(--color-navy);
+  transition: border-color 0.15s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-navy);
+}
+
+.form-input[readonly] {
+  background: var(--color-gray-bg);
+  color: #666;
+}
+
+.email-warning {
+  margin-top: 8px;
+  font-size: var(--fs-email-warning);
+  font-weight: 700;
+  color: var(--color-red);
+  line-height: 1.5;
+}
+
+/* ---- 버튼 ---- */
+.button-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.button-row--single {
+  justify-content: center;
+}
+
+.btn {
+  flex: 1;
+  min-height: 52px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 6px;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn:active {
+  opacity: 0.8;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-navy);
+  color: var(--color-white);
+}
+
+.btn-primary:active {
+  background: var(--color-navy-hover);
+}
+
+.btn-secondary {
+  background: var(--color-gray-bg);
+  color: var(--color-navy);
+  border: 2px solid var(--color-gray-border);
+}
+
+/* ---- 대기리스트 ---- */
+.waitlist-guide {
+  background: var(--color-white);
+  color: var(--color-blue);
+  font-size: var(--fs-waitlist-guide);
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.waitlist-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.waitlist-item {
+  padding: 14px 16px;
+  background: var(--color-white);
+  border: 2px solid var(--color-gray-border);
+  border-radius: 6px;
+  font-size: var(--fs-waitlist-name);
+  font-weight: 700;
+  color: var(--color-navy);
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.waitlist-item:active {
+  background: var(--color-gray-bg);
+  border-color: var(--color-navy);
+}
+
+.waitlist-empty,
+.waitlist-loading,
+.waitlist-error {
+  text-align: center;
+  padding: 30px 16px;
+  color: #888;
+  font-size: 16px;
+}
+
+.waitlist-error {
+  color: var(--color-red);
+}
+
+/* ---- 모달 ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-box {
+  background: var(--color-white);
+  border-radius: 10px;
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-box--wide {
+  max-width: 500px;
+}
+
+.modal-box--narrow {
+  max-width: 360px;
+}
+
+.modal-title {
+  font-size: var(--fs-auth-header);
+  font-weight: 700;
+  color: var(--color-navy);
+  margin-bottom: 20px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.modal-input {
+  font-size: 22px;
+  text-align: center;
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+}
+
+.modal-error {
+  font-size: var(--fs-auth-body);
+  font-weight: 700;
+  color: var(--color-red);
+  margin-top: 8px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.modal-message-text {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--color-navy);
+  margin-bottom: 20px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ---- 토스트 ---- */
+.toast-container {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--color-navy);
+  color: var(--color-white);
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: toastIn 0.2s ease-out, toastOut 0.3s ease-in 2.2s forwards;
+}
+
+.toast--error {
+  background: var(--color-red);
+}
+
+.toast--success {
+  background: #27ae60;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* ---- 반응형 조정 (태블릿 세로 기준이므로 최소 대응만) ---- */
+@media (max-width: 600px) {
+  .panel-left {
+    flex: 0 0 60%;
+  }
+}
