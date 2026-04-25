@@ -63,11 +63,11 @@ input {
   --color-secondary: #95a5a6;
 
   /* 고객 지정 폰트 크기 */
-  --fs-panel-header: 21px;
-  --fs-label: 19px;
-  --fs-notice: 18px;
-  --fs-waitlist-name: 19px;
-  --fs-email-warning: 16px;
+  --fs-panel-header: 37px;
+  --fs-label: 33px;
+  --fs-notice: 30px;
+  --fs-waitlist-name: 27px;
+  --fs-email-warning: 22px;
   --fs-waitlist-guide: 17px;
   --fs-auth-header: 21px;
   --fs-auth-body: 16px;
