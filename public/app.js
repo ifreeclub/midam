@@ -412,6 +412,7 @@ function isValidPhoneStrict(phone) {
     els.modalEdit.hidden = true
     state.authTarget = null
     state.verifiedLast4 = null
+    resetForm();
   }
 
   async function handleEditSave() {
