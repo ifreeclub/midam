@@ -273,7 +273,7 @@ body.debug-border .form-group {
 }
 
 .email-warning {
-  margin-top: 0px;
+  margin-top: -4px;
   margin-bottom: 8px;
   font-size: var(--fs-email-warning);
   font-weight: 700;
