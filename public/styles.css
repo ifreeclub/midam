@@ -281,6 +281,15 @@ body.debug-border .form-group {
   line-height: 1.5;
 }
 
+.email-warning-text {
+  font-size: var(--fs-email-warning);
+  font-weight: 700;
+  color: var(--color-red);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+
 /* ---- 버튼 ---- */
 .button-row {
   display: flex;
