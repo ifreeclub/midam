@@ -248,7 +248,7 @@ body.debug-border .form-group {
   font-size: var(--fs-label);
   font-weight: 700;
   color: var(--color-navy);
-  margin-bottom: 2px;
+  margin-bottom: 0px;
 }
 
 .form-input {
@@ -274,7 +274,7 @@ body.debug-border .form-group {
 
 .email-warning {
   margin-top: 0px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   font-size: var(--fs-email-warning);
   font-weight: 700;
   color: var(--color-red);
