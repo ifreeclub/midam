@@ -94,7 +94,7 @@ function handleRequest(e, method) {
       case 'list':
         return jsonResponse(listWaiting())
       case 'create':
-        return jsonResponse(createEntry(params.data))
+        return jsonResponse(createEntry(params.data, params.requestId))
       case 'verify':
         return jsonResponse(verifyPhone(params.id, params.last4))
       case 'update':
@@ -302,7 +302,27 @@ function listWaiting() {
 // 액션 2 - 신규 접수 등록
 // ============================================================
 
-function createEntry(data) {
+// 같은 등록 요청이 두 번 들어오면(응답 지연 후 재시도) 처음 결과를 돌려주고 행을 추가하지 않음
+const CREATE_DEDUP_TTL_SEC = 21600
+
+function normalizeRequestId(requestId) {
+  const rid = String(requestId || '').trim()
+  return /^[A-Za-z0-9-]{8,64}$/.test(rid) ? rid : ''
+}
+
+function getCachedCreate(cache, rid) {
+  if (!rid) return null
+  const hit = cache.get('create:' + rid)
+  if (!hit) return null
+  try { return JSON.parse(hit) } catch (e) { return null }
+}
+
+function createEntry(data, requestId) {
+  const rid = normalizeRequestId(requestId)
+  const cache = CacheService.getScriptCache()
+  const cached = getCachedCreate(cache, rid)
+  if (cached) return cached
+
   if (!data || typeof data !== 'object') {
     return { ok: false, error: 'INVALID_DATA' }
   }
@@ -324,6 +344,10 @@ function createEntry(data) {
   const lock = LockService.getScriptLock()
   try {
     lock.waitLock(10000)
+
+    // 락 대기 중 같은 요청이 먼저 처리됐을 수 있어 다시 확인
+    const cachedInLock = getCachedCreate(cache, rid)
+    if (cachedInLock) return cachedInLock
 
     const sheet = getSheet()
     const { map, headers, lastCol } = getHeaderMap(sheet)
@@ -356,7 +380,9 @@ function createEntry(data) {
 
     sheet.getRange(targetRow, 1, 1, lastCol).setValues([newRow])
 
-    return { ok: true, id: id, name: name, date: today, rowIndex: targetRow }
+    const result = { ok: true, id: id, name: name, date: today, rowIndex: targetRow }
+    if (rid) cache.put('create:' + rid, JSON.stringify(result), CREATE_DEDUP_TTL_SEC)
+    return result
   } catch (err) {
     Logger.log('createEntry error: ' + err.stack)
     return { ok: false, error: 'CREATE_FAILED', message: String(err) }
