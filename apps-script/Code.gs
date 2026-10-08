@@ -30,7 +30,7 @@ const CONFIG = {
   SHEET_NAME: '미담_앱접수',
   API_TOKEN: 'midam-2026-secret-token',
   DEFAULT_STATUS: '촬영',
-  EXCLUDE_STATUS: ['완료', '취소'],
+  EXCLUDE_STATUS: ['완료', '취소', '보완'],
 
   // ==========================================================
   // 대기리스트 정렬 설정 (SORT_ORDER)
